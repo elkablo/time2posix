@@ -43,12 +43,12 @@ struct leapsecond
   int prev_change;
 };
 
-static struct leapsecond *leapsecs = NULL;
-static size_t leapsecs_num = 0;
+struct leapsecond *t2p_leapsecs = NULL;
+size_t t2p_leapsecs_num = 0;
 
 /* read the leap seconds table */
-static int
-leaps_read (void)
+int
+t2p_leaps_read (void)
 {
   int fd, prev_change;
   const char *buf;
@@ -78,17 +78,17 @@ leaps_read (void)
   if (n == 0)
     goto err;
 
-  leapsecs = malloc (n * sizeof (struct leapsecond));
-  if (leapsecs == NULL)
+  t2p_leapsecs = malloc (n * sizeof (struct leapsecond));
+  if (t2p_leapsecs == NULL)
     goto err;
-  leapsecs_num = n;
+  t2p_leapsecs_num = n;
 
   /* skip unimportant stuff */
   skip = 5*be32toh (lbuf[8]) + 6*be32toh (lbuf[9]) + be32toh (lbuf[10]);
   lbuf = (const u_int32_t *) (buf + 44 + skip);
 
   prev_change = 0;
-  for (i = 0, ptr = leapsecs; i < n; i++, ptr++)
+  for (i = 0, ptr = t2p_leapsecs; i < n; i++, ptr++)
     {
       time_t transition, posix_transition, daystart, posix_daystart;
       int change, type;
@@ -139,19 +139,19 @@ err:
    1341100825 1341100800 0
    1341100826 1341100801 0
    */
-static time_t
-time2posix (time_t t, int *state)
+time_t
+t2p_time2posix (time_t t, int *state)
 {
   time_t res = t;
-  size_t i = leapsecs_num;
+  size_t i = t2p_leapsecs_num;
   struct leapsecond *ptr;
 
   do
     if (i-- == 0)
       return res;
-  while (t < leapsecs[i].transition);
+  while (t < t2p_leapsecs[i].transition);
 
-  ptr = leapsecs + i;
+  ptr = t2p_leapsecs + i;
 
   res = t - ptr->change;
 
@@ -188,19 +188,19 @@ time2posix (time_t t, int *state)
    1341100800 1341100825 0
    1341100801 1341100826 0
    */
-static time_t
-posix2time (time_t t, int *state)
+time_t
+t2p_posix2time (time_t t, int *state)
 {
   time_t res = t;
-  size_t i = leapsecs_num;
+  size_t i = t2p_leapsecs_num;
   struct leapsecond *ptr;
 
   do
     if (i-- == 0)
       return;
-  while (t < leapsecs[i].posix_transition);
+  while (t < t2p_leapsecs[i].posix_transition);
 
-  ptr = leapsecs + i;
+  ptr = t2p_leapsecs + i;
 
   res = t + ptr->change;
 
@@ -223,8 +223,8 @@ posix2time (time_t t, int *state)
 }
 
 /* normalize struct timeval */
-static inline struct timeval *
-normalize_tv (struct timeval *tv)
+inline struct timeval *
+t2p_normalize_timeval (struct timeval *tv)
 {
   while (tv->tv_usec >= 1000000)
     {
@@ -239,8 +239,8 @@ normalize_tv (struct timeval *tv)
    (That means that 2 second will pass from 23:59:59 to 00:00:00).
    If a leap second is being deleted, simulates speedup of the 23:59:58 second.
    (That means that 1 second will pass from 23:59:58 to 00:00:00).  */
-static struct timeval *
-time2posix_tv (struct timeval *tv)
+struct timeval *
+t2p_time2posix_timeval (struct timeval *tv)
 {
   int state;
   tv->tv_sec = time2posix (tv->tv_sec, &state);
@@ -251,21 +251,21 @@ time2posix_tv (struct timeval *tv)
   else if (state == -1)
     {
       tv->tv_usec <<= 1;
-      normalize_tv (tv);
+      t2p_normalize_timeval (tv);
     }
   return tv;
 }
 
 /* Inverse to the previous function. */
 static struct timeval *
-posix2time_tv (struct timeval *tv)
+t2p_posix2time_timeval (struct timeval *tv)
 {
   int state;
   tv->tv_sec = posix2time (tv->tv_sec, &state);
   if (state == 1)
     {
       tv->tv_usec <<= 1;
-      normalize_tv (tv);
+      t2p_normalize_timeval (tv);
     }
   else if (state == -1)
     tv->tv_usec >>= 1;
@@ -275,8 +275,8 @@ posix2time_tv (struct timeval *tv)
 }
 
 /* normalize struct timespec */
-static inline struct timespec *
-normalize_ts (struct timespec *ts)
+inline struct timespec *
+t2p_normalize_timespec (struct timespec *ts)
 {
   while (ts->tv_nsec >= 1000000000)
     {
@@ -286,9 +286,9 @@ normalize_ts (struct timespec *ts)
   return ts;
 }
 
-/* struct timespec version of time2posix_tv */
+/* struct timespec version of t2p_time2posix_timeval */
 static struct timespec *
-time2posix_ts (struct timespec *ts)
+t2p_time2posix_timespec (struct timespec *ts)
 {
   int state;
   ts->tv_sec = time2posix (ts->tv_sec, &state);
@@ -299,21 +299,21 @@ time2posix_ts (struct timespec *ts)
   else if (state == -1)
     {
       ts->tv_nsec <<= 1;
-      normalize_ts (ts);
+      t2p_normalize_timespec (ts);
     }
   return ts;
 }
 
-/* struct timespec version of posix2time_tv */
+/* struct timespec version of t2p_posix2time_timeval */
 static struct timespec *
-posix2time_ts (struct timespec *ts)
+t2p_posix2time_timespec (struct timespec *ts)
 {
   int state;
   ts->tv_sec = posix2time (ts->tv_sec, &state);
   if (state == 1)
     {
       ts->tv_nsec <<= 1;
-      normalize_ts (ts);
+      t2p_normalize_timespec (ts);
     }
   else if (state == -1)
     ts->tv_nsec >>= 1;
@@ -332,12 +332,12 @@ posix2time_ts (struct timespec *ts)
    If a leap second was deleted in the previous second, return TIME_WAIT.
 
    Otherwise return TIME_OK.  */
-static inline int
-time_status (time_t t)
+int
+t2p_timestatus (time_t t)
 {
   struct leapsecond *ptr;
 
-  for (ptr = leapsecs + leapsecs_num - 1; ptr >= leapsecs; ptr--)
+  for (ptr = t2p_leapsecs + t2p_leapsecs_num - 1; ptr >= t2p_leapsecs; ptr--)
     {
       if (ptr->type)
         {
@@ -372,13 +372,13 @@ testthis (void)
   struct timeval tv;
   int i;
 
-  t = leapsecs[leapsecs_num-1].transition-2;
+  t = t2p_leapsecs[t2p_leapsecs_num-1].transition-2;
   e = t + 6;
   printf ("time       time2posix st posix2time st status\n");
   for (; t < e; t++)
     {
       time_t t2p, p2t;
-      int st1, st2, status = time_status (t);
+      int st1, st2, status = t2p_timestatus (t);
 
       t2p = time2posix (t, &st1);
 
@@ -399,18 +399,18 @@ testthis (void)
     }
 
   printf ("\ntime         time2posix   posix2time\n");
-  tv.tv_sec = leapsecs[leapsecs_num-1].transition;
+  tv.tv_sec = t2p_leapsecs[t2p_leapsecs_num-1].transition;
   tv.tv_usec = 0;
   for (i = 0; i < 20; i++)
     {
       struct timeval t2p, p2t;
       t2p = tv;
-      time2posix_tv (&t2p);
+      t2p_time2posix_timeval (&t2p);
       p2t = t2p;
-      posix2time_tv (&p2t);
+      t2p_posix2time_timeval (&p2t);
       printf ("%li.%li %li.%li %li.%li\n", tv.tv_sec, tv.tv_usec/100000, t2p.tv_sec, t2p.tv_usec/100000, p2t.tv_sec, p2t.tv_usec/100000);
       tv.tv_usec += 200000;
-      normalize_tv (&tv);
+      t2p_normalize_timeval (&tv);
     }
 }
 
@@ -431,14 +431,14 @@ static int (*adjtimex_orig) (struct timex *);
 static int (*ntp_adjtime_orig) (struct timex *);
 static int (*ntp_gettime_orig) (struct ntptimeval *);
 
-static void *handle = NULL;
+static void *t2p_libc_handle = NULL;
 
-static void init (void) __attribute__((constructor));
-static void fini (void) __attribute__((destructor));
+static void t2p_init (void) __attribute__((constructor));
+static void t2p_fini (void) __attribute__((destructor));
 
 /* initialize leap seconds table and original function pointers */
 static void
-init (void)
+t2p_init (void)
 {
   static int doneinit = 0;
 
@@ -451,8 +451,8 @@ init (void)
   if (0)
     testthis ();
 
-  handle = dlopen ("libc.so.6", RTLD_LAZY);
-  if (!handle)
+  t2p_libc_handle = dlopen ("libc.so.6", RTLD_LAZY);
+  if (!t2p_libc_handle)
     exit (255);
 
 /*
@@ -461,23 +461,23 @@ init (void)
   updwtmp_orig = dlsym (handle, "updwtmp");
   updwtmpx_orig = dlsym (handle, "updwtmpx");
 */
-  time_orig = dlsym (handle, "time");
-  stime_orig = dlsym (handle, "stime");
-  clock_gettime_orig = dlsym (handle, "clock_gettime");
-  clock_settime_orig = dlsym (handle, "clock_settime");
-  clock_adjtime_orig = dlsym (handle, "clock_adjtime");
-  gettimeofday_orig = dlsym (handle, "gettimeofday");
-  settimeofday_orig = dlsym (handle, "settimeofday");
-  adjtimex_orig = dlsym (handle, "adjtimex");
-  ntp_adjtime_orig = dlsym (handle, "ntp_adjtime");
-  ntp_gettime_orig = dlsym (handle, "ntp_gettime");
+  time_orig = dlsym (t2p_libc_handle, "time");
+  stime_orig = dlsym (t2p_libc_handle, "stime");
+  clock_gettime_orig = dlsym (t2p_libc_handle, "clock_gettime");
+  clock_settime_orig = dlsym (t2p_libc_handle, "clock_settime");
+  clock_adjtime_orig = dlsym (t2p_libc_handle, "clock_adjtime");
+  gettimeofday_orig = dlsym (t2p_libc_handle, "gettimeofday");
+  settimeofday_orig = dlsym (t2p_libc_handle, "settimeofday");
+  adjtimex_orig = dlsym (t2p_libc_handle, "adjtimex");
+  ntp_adjtime_orig = dlsym (t2p_libc_handle, "ntp_adjtime");
+  ntp_gettime_orig = dlsym (t2p_libc_handle, "ntp_gettime");
 }
 
 static void
-fini (void)
+t2p_fini (void)
 {
-  if (handle != NULL)
-    dlclose (handle);
+  if (t2p_libc_handle != NULL)
+    dlclose (t2p_libc_handle);
 }
 
 /*
@@ -534,7 +534,7 @@ clock_gettime (clockid_t clkid, struct timespec *ts)
 {
   int res = clock_gettime_orig (clkid, ts);
   if (clkid == CLOCK_REALTIME || clkid == CLOCK_REALTIME_COARSE)
-    time2posix_ts (ts);
+    t2p_time2posix_timespec (ts);
   return res;
 }
 
@@ -545,7 +545,7 @@ clock_settime (clockid_t clkid, const struct timespec *ts)
     {
       struct timespec myts;
       memcpy (&myts, ts, sizeof (struct timespec));
-      posix2time_ts (&myts);
+      t2p_posix2time_timespec (&myts);
       return clock_settime_orig (clkid, &myts);
     }
   else
@@ -557,7 +557,7 @@ gettimeofday (struct timeval *tv, struct timezone *tz)
 {
   int res = gettimeofday_orig (tv, tz);
   if (tv != NULL)
-    time2posix_tv (tv);
+    t2p_time2posix_timeval (tv);
   return res;
 }
 
@@ -568,7 +568,7 @@ settimeofday (const struct timeval *tv, const struct timezone *tz)
     {
       struct timeval mytv;
       memcpy (&mytv, tv, sizeof (struct timeval));
-      posix2time_tv (&mytv);
+      t2p_posix2time_timeval (&mytv);
       return settimeofday_orig (&mytv, tz);
     }
   else
@@ -587,7 +587,7 @@ adjtimex (struct timex *buf)
   buf->status &= ~(STA_INS|STA_DEL);
   res = adjtimex_orig (buf);
 
-  status = time_status (buf->time.tv_sec);
+  status = t2p_timestatus (buf->time.tv_sec);
 
   /* will/did something interesting happen today? */
   switch (status)
@@ -601,7 +601,7 @@ adjtimex (struct timex *buf)
         break;
     }
 
-  time2posix_tv (&buf->time);
+  t2p_time2posix_timeval (&buf->time);
 
   return res == TIME_OK ? status : res;
 }
@@ -628,6 +628,6 @@ ntp_gettime (struct ntptimeval *buf)
 {
   int res = ntp_gettime_orig (buf);
   if (buf != NULL)
-    time2posix_tv (&buf->time);
+    t2p_time2posix_timeval (&buf->time);
   return res;
 }
