@@ -25,12 +25,12 @@ time2posix: time2posix.in
 	sed -e 's|@prefix@|$(PREFIX)|' -e 's|@libdir@|$(LIBDIR)|' time2posix.in >time2posix
 	chmod +x time2posix
 
-ntpd: ntpd.in
-	sed -e 's|@prefix@|$(PREFIX)|' -e 's|@libdir@|$(LIBDIR)|' ntpd.in >ntpd
+ntpd:
+	echo -e '#!/bin/sh\n\nexec $(PREFIX)/bin/time2posix /usr/sbin/ntpd "$$@"' >ntpd
 	chmod +x ntpd
 
-ntpdate: ntpdate.in
-	sed -e 's|@prefix@|$(PREFIX)|' -e 's|@libdir@|$(LIBDIR)|' ntpdate.in >ntpdate
+ntpdate:
+	echo -e '#!/bin/sh\n\nexec $(PREFIX)/bin/time2posix /usr/sbin/ntpdate "$$@"' >ntpdate
 	chmod +x ntpdate
 
 time2posix.so: $(OBJS)

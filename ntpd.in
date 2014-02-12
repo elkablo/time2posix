@@ -1,7 +1,0 @@
-#!/bin/sh
-
-if [ "x$TZ" == "x" ]; then
-	TZ=$(cat /etc/timezone)
-fi
-
-TZ=posix/$(echo $TZ | sed -e 's|right/||') LD_PRELOAD=@prefix@/@libdir@/time2posix.so exec /usr/sbin/ntpd "$@"
