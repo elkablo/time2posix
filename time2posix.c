@@ -18,6 +18,7 @@
 
 struct leapsecond *t2p_leapsecs = NULL;
 size_t t2p_leapsecs_num = 0;
+time_t t2p_last_read = 0;
 
 /* read the leap seconds table */
 int
@@ -27,41 +28,63 @@ t2p_leaps_read (void)
   const char *buf;
   const u_int32_t *lbuf;
   u_int32_t n, skip, i;
-  struct leapsecond *ptr;
+  struct leapsecond *ptr, *leapsecs;
+  time_t now;
+
+  /* we don't need to re-read every time
+     (keep the same table at least for 30 days) */
+  now = t2p_orig_time (NULL);
+  if (now < (t2p_last_read + 86400*30))
+    return 0;
 
   /* does O_NONBLOCK need to be here if we are mmapping? */
   fd = open (LEAP_TZFILE, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
   if (fd < 0)
-    return -1;
+    {
+      fprintf (stderr, "time2posix error: Cannot open %s !\n", LEAP_TZFILE);
+      return -1;
+    }
 
   /* right/UTC shouldn't be bigger than 4096B */
   buf = mmap (NULL, 4096, PROT_READ, MAP_PRIVATE, fd, 0);
   close (fd);
   if (buf == MAP_FAILED)
-    return (-1);
+    {
+      fprintf (stderr, "time2posix error: Cannot mmap %s !\n", LEAP_TZFILE);
+      return (-1);
+    }
 
   /* check the header */
   if (memcmp (buf, (const void *) "TZif", 4))
-    goto err;
+    {
+      fprintf (stderr, "time2posix error: Invalid %s header !\n", LEAP_TZFILE);
+      goto err;
+    }
 
   lbuf = (const u_int32_t *) buf;
 
   /* number of leap seconds in database */
   n = be32toh (lbuf[7]);
   if (n == 0)
-    goto err;
+    {
+      fprintf (stderr, "time2posix warning: No leap seconds in %s !%s\n", LEAP_TZFILE,
+               t2p_leapsecs != NULL ? " Using old table." : "");
+      goto end;
+    }
 
-  t2p_leapsecs = malloc (n * sizeof (struct leapsecond));
-  if (t2p_leapsecs == NULL)
-    goto err;
-  t2p_leapsecs_num = n;
+  leapsecs = malloc (n * sizeof (struct leapsecond));
+  if (leapsecs == NULL)
+    {
+      fprintf (stderr, "time2posix error: Cannot allocate space for leap seconds table!\n");
+      goto err;
+    }
 
   /* skip unimportant stuff */
   skip = 5*be32toh (lbuf[8]) + 6*be32toh (lbuf[9]) + be32toh (lbuf[10]);
   lbuf = (const u_int32_t *) (buf + 44 + skip);
 
   prev_change = 0;
-  for (i = 0, ptr = t2p_leapsecs; i < n; i++, ptr++)
+  for (i = 0, ptr = leapsecs; i < n; i++, ptr++)
     {
       time_t transition, posix_transition, daystart, posix_daystart;
       int change, type;
@@ -89,6 +112,14 @@ t2p_leaps_read (void)
       prev_change = change;
     }
 
+  /* this should be protected by some rw lock */
+  if (t2p_leapsecs != NULL)
+    free (t2p_leapsecs);
+  t2p_leapsecs = leapsecs;
+  t2p_leapsecs_num = n;
+  t2p_last_read = now;
+
+end:
   munmap ((void *) buf, 4096);
   return 0;
 err:
@@ -118,6 +149,9 @@ t2p_time2posix (time_t t, int *state)
   time_t res = t;
   size_t i = t2p_leapsecs_num;
   struct leapsecond *ptr;
+
+  /* reread leap seconds table sometimes */
+  t2p_leaps_read ();
 
   do
     if (i-- == 0)
@@ -167,6 +201,9 @@ t2p_posix2time (time_t t, int *state)
   time_t res = t;
   size_t i = t2p_leapsecs_num;
   struct leapsecond *ptr;
+
+  /* reread leap seconds table sometimes */
+  t2p_leaps_read ();
 
   do
     if (i-- == 0)
@@ -346,30 +383,14 @@ static void t2p_fini (void) __attribute__((destructor));
 static void
 t2p_init (void)
 {
-  static int doneinit = 0;
-
-  if (doneinit)
-    return;
-
-  if (t2p_leaps_read ())
-    exit (255);
-
-  if (0)
-    testthis ();
-
   t2p_libc_handle = dlopen ("libc.so.6", RTLD_LAZY);
   if (!t2p_libc_handle)
     exit (255);
 
-#if 0
-# define fetchsymbol(name) \
+#define fetchsymbol(name) \
   t2p_orig_##name = dlsym (t2p_libc_handle, #name); \
   if (t2p_orig_##name == NULL) \
-    fprintf (stderr, "Cannot load symbol " #name " from libc.so.6!\n")
-#else
-# define fetchsymbol(name) \
-  t2p_orig_##name = dlsym (t2p_libc_handle, #name)
-#endif
+    fprintf (stderr, "time2posix error: Cannot load symbol " #name " from libc.so.6!\n")
 
   fetchsymbol(getutent);
   fetchsymbol(getutid);
@@ -397,6 +418,9 @@ t2p_init (void)
   fetchsymbol(adjtimex);
   fetchsymbol(ntp_adjtime);
   fetchsymbol(ntp_gettime);
+
+  if (t2p_leaps_read ())
+    exit (255);
 }
 
 static void
