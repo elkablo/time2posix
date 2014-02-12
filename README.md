@@ -1,7 +1,7 @@
 time2posix
 ==========
 
-POSIX timestamps compatibility library for glibc/linux system which uses *right timestamp* (with leap seconds)
+POSIX timestamps compatibility library for glibc/linux systems which use *right timestamp* (with leap seconds) on system clock
 
 # WTF?
 
@@ -56,9 +56,9 @@ This discontinuity can reflect on your system clock in several ways:
 (Although leap second deletion didn't occur in the 40 years of leap seconds usage).
 
 Because of this there are points in time with no proper representation in Unix timestamp.
-For example, the leap second inserted between 23:59:59 June 30, 2012 and 00:00:00 July 1, 2012
--- written as 23:59:60 June 30, 2012 -- has no representation. The first one is 1341100799, the
-second one is 1341100800.
+For example, the leap second inserted between 23:59:59 June 30, 2012 (Unix time 1341100799)
+and 00:00:00 July 1, 2012 (Unix time 1341100800)
+-- written as 23:59:60 June 30, 2012 -- has no representation in Unix timestamp.
 
 Modern NTP synchronized kernels do not step/stop/skip when a leap second occurs, instead
 they speed up or slow down for a while and the leap second accumulates slowly. The clock
@@ -73,7 +73,7 @@ they expect time_t to represent **right timestamp**, that is the number of secon
 elapsed since 00:00:00 UTC, Thursday, 1 January 1970, **couting leap seconds** (instead of
 not counting leap seconds).
 
-As of February 2014, right timestamp is 25 seconds larger than Unix timestamp.
+As of February 2014, right timestamp is 25 seconds greater than Unix timestamp.
 
 See http://www.ucolick.org/~sla/leapsecs/right+gps.html for more information about why
 this definition brekas Unix expectations.
