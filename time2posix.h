@@ -50,12 +50,24 @@ struct timespec *t2p_time2posix_timespec (struct timespec *);
 struct timespec *t2p_posix2time_timespec (struct timespec *);
 int t2p_timestatus (time_t);
 
-/*
+/* utmp.c */
+extern struct utmp *(*t2p_orig_getutent) (void);
+extern struct utmp *(*t2p_orig_getutid) (const struct utmp *);
+extern struct utmp *(*t2p_orig_getutline) (const struct utmp *);
 extern struct utmp *(*t2p_orig_pututline) (const struct utmp *);
 extern void (*t2p_orig_updwtmp) (const char *, const struct utmp *);
+
+extern int (*t2p_orig_getutent_r) (struct utmp *, struct utmp **);
+extern int (*t2p_orig_getutid_r) (const struct utmp *, struct utmp *, struct utmp **);
+extern int (*t2p_orig_getutline_r) (const struct utmp *, struct utmp *, struct utmp **);
+
+extern struct utmpx *(*t2p_orig_getutxent) (void);
+extern struct utmpx *(*t2p_orig_getutxid) (const struct utmpx *);
+extern struct utmpx *(*t2p_orig_getutxline) (const struct utmpx *);
 extern struct utmpx *(*t2p_orig_pututxline) (const struct utmpx *);
 extern void (*t2p_orig_updwtmpx) (const char *, const struct utmpx *);
-*/
+
+/* time.c */
 extern time_t (*t2p_orig_time) (time_t *);
 extern int (*t2p_orig_stime) (const time_t *);
 extern int (*t2p_orig_clock_gettime) (clockid_t, struct timespec *);

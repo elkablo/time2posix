@@ -5,6 +5,17 @@
 
 #include "time2posix.h"
 
+time_t (*t2p_orig_time) (time_t *);
+int (*t2p_orig_stime) (const time_t *);
+int (*t2p_orig_clock_gettime) (clockid_t, struct timespec *);
+int (*t2p_orig_clock_settime) (clockid_t, const struct timespec *);
+int (*t2p_orig_clock_adjtime) (clockid_t, struct timex *);
+int (*t2p_orig_gettimeofday) (struct timeval *, struct timezone *);
+int (*t2p_orig_settimeofday) (const struct timeval *, const struct timezone *);
+int (*t2p_orig_adjtimex) (struct timex *);
+int (*t2p_orig_ntp_adjtime) (struct timex *);
+int (*t2p_orig_ntp_gettime) (struct ntptimeval *);
+
 time_t time (time_t *t)
 {
   int state;

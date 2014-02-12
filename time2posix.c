@@ -337,23 +337,6 @@ t2p_timestatus (time_t t)
   return TIME_OK;
 }
 
-/*
-struct utmp *(*t2p_orig_pututline) (const struct utmp *);
-void (*t2p_orig_updwtmp) (const char *, const struct utmp *);
-struct utmpx *(*t2p_orig_pututxline) (const struct utmpx *);
-void (*t2p_orig_updwtmpx) (const char *, const struct utmpx *);
-*/
-time_t (*t2p_orig_time) (time_t *);
-int (*t2p_orig_stime) (const time_t *);
-int (*t2p_orig_clock_gettime) (clockid_t, struct timespec *);
-int (*t2p_orig_clock_settime) (clockid_t, const struct timespec *);
-int (*t2p_orig_clock_adjtime) (clockid_t, struct timex *);
-int (*t2p_orig_gettimeofday) (struct timeval *, struct timezone *);
-int (*t2p_orig_settimeofday) (const struct timeval *, const struct timezone *);
-int (*t2p_orig_adjtimex) (struct timex *);
-int (*t2p_orig_ntp_adjtime) (struct timex *);
-int (*t2p_orig_ntp_gettime) (struct ntptimeval *);
-
 static void *t2p_libc_handle = NULL;
 
 static void t2p_init (void) __attribute__((constructor));
@@ -378,22 +361,42 @@ t2p_init (void)
   if (!t2p_libc_handle)
     exit (255);
 
-/*
-  t2p_orig_pututline = dlsym (handle, "pututline");
-  t2p_orig_pututxline = dlsym (handle, "pututxline");
-  t2p_orig_updwtmp = dlsym (handle, "updwtmp");
-  t2p_orig_updwtmpx = dlsym (handle, "updwtmpx");
-*/
-  t2p_orig_time = dlsym (t2p_libc_handle, "time");
-  t2p_orig_stime = dlsym (t2p_libc_handle, "stime");
-  t2p_orig_clock_gettime = dlsym (t2p_libc_handle, "clock_gettime");
-  t2p_orig_clock_settime = dlsym (t2p_libc_handle, "clock_settime");
-  t2p_orig_clock_adjtime = dlsym (t2p_libc_handle, "clock_adjtime");
-  t2p_orig_gettimeofday = dlsym (t2p_libc_handle, "gettimeofday");
-  t2p_orig_settimeofday = dlsym (t2p_libc_handle, "settimeofday");
-  t2p_orig_adjtimex = dlsym (t2p_libc_handle, "adjtimex");
-  t2p_orig_ntp_adjtime = dlsym (t2p_libc_handle, "ntp_adjtime");
-  t2p_orig_ntp_gettime = dlsym (t2p_libc_handle, "ntp_gettime");
+#if 0
+# define fetchsymbol(name) \
+  t2p_orig_##name = dlsym (t2p_libc_handle, #name); \
+  if (t2p_orig_##name == NULL) \
+    fprintf (stderr, "Cannot load symbol " #name " from libc.so.6!\n")
+#else
+# define fetchsymbol(name) \
+  t2p_orig_##name = dlsym (t2p_libc_handle, #name)
+#endif
+
+  fetchsymbol(getutent);
+  fetchsymbol(getutid);
+  fetchsymbol(getutline);
+  fetchsymbol(pututline);
+  fetchsymbol(updwtmp);
+
+  fetchsymbol(getutent_r);
+  fetchsymbol(getutid_r);
+  fetchsymbol(getutline_r);
+
+  fetchsymbol(getutxent);
+  fetchsymbol(getutxid);
+  fetchsymbol(getutxline);
+  fetchsymbol(pututxline);
+  fetchsymbol(updwtmpx);
+
+  fetchsymbol(time);
+  fetchsymbol(stime);
+  fetchsymbol(clock_gettime);
+  fetchsymbol(clock_settime);
+  fetchsymbol(clock_adjtime);
+  fetchsymbol(gettimeofday);
+  fetchsymbol(settimeofday);
+  fetchsymbol(adjtimex);
+  fetchsymbol(ntp_adjtime);
+  fetchsymbol(ntp_gettime);
 }
 
 static void
