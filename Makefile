@@ -16,8 +16,10 @@ all: time2posix.so ntpd ntpdate time2posix
 install: all
 	install -d $(DESTDIR)$(PREFIX)/$(LIBDIR)
 	install -t $(DESTDIR)$(PREFIX)/$(LIBDIR) time2posix.so
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -t $(DESTDIR)$(PREFIX)/bin time2posix
 	install -d $(DESTDIR)$(PREFIX)/sbin
-	install -t $(DESTDIR)$(PREFIX)/sbin ntpd ntpdate time2posix
+	install -t $(DESTDIR)$(PREFIX)/sbin ntpd ntpdate
 
 time2posix: time2posix.in
 	sed -e 's|@prefix@|$(PREFIX)|' -e 's|@libdir@|$(LIBDIR)|' time2posix.in >time2posix
