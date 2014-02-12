@@ -57,7 +57,7 @@ This discontinuity can reflect on your system clock in several ways:
 
 Because of this there are points in time with no proper representation in Unix timestamp.
 For example, the leap second inserted between 23:59:59 June 30, 2012 and 00:00:00 July 1, 2012
-- written as 23:59:60 June 30, 2012 - has no representation. The first one is 1341100799, the
+-- written as 23:59:60 June 30, 2012 -- has no representation. The first one is 1341100799, the
 second one is 1341100800.
 
 Modern NTP synchronized kernels do not step/stop/skip when a leap second occurs, instead
