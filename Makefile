@@ -1,5 +1,7 @@
-OBJS	=	\
-	time2posix.o
+OBJS	=		\
+	time2posix.o	\
+	time.o		\
+	utmp.o
 
 DESTDIR ?=
 PREFIX ?= /usr/local
@@ -32,7 +34,10 @@ time2posix.so: $(OBJS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(OBJS) time2posix.so ntpd ntpdate
+	rm -f $(OBJS) time2posix.so ntpd ntpdate t2p_test
 
-test: time2posix.so
-	LD_PRELOAD=$$(pwd)/time2posix.so date
+t2p_test: t2p_test.c
+	$(CC) $(CFLAGS) -Wl,-rpath,$$(pwd) -L$$(pwd) time2posix.so -o t2p_test t2p_test.c
+
+test: time2posix.so t2p_test
+	./t2p_test

@@ -7,41 +7,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <dlfcn.h>
-#include <utmp.h>
-#include <utmpx.h>
 #include <sys/types.h>
-#include <time.h>
-#include <sys/time.h>
-#include <sys/timex.h>
 #include <sys/mman.h>
 #include <endian.h>
 
+#include "time2posix.h"
+
 #define RIGHT_TZ "right/UTC"
 #define LEAP_TZFILE ("/usr/share/zoneinfo/" RIGHT_TZ)
-
-struct leapsecond
-{
-  /* 0 for leap second deletion, 1 for insertion */
-  int type;
-
-  /* time of the transition */
-  time_t transition;
-
-  /* posix version of the previous */
-  time_t posix_transition;
-
-  /* start of the day when transition will occur */
-  time_t daystart;
-
-  /* posix version of the previous */
-  time_t posix_daystart;
-
-  /* difference between right and posix time just after this leap second */
-  int change;
-
-  /* difference between right and posix time just before this leap second */
-  int prev_change;
-};
 
 struct leapsecond *t2p_leapsecs = NULL;
 size_t t2p_leapsecs_num = 0;
@@ -243,7 +216,7 @@ struct timeval *
 t2p_time2posix_timeval (struct timeval *tv)
 {
   int state;
-  tv->tv_sec = time2posix (tv->tv_sec, &state);
+  tv->tv_sec = t2p_time2posix (tv->tv_sec, &state);
   if (state == 1)
     tv->tv_usec >>= 1;
   else if (state == 2)
@@ -257,11 +230,11 @@ t2p_time2posix_timeval (struct timeval *tv)
 }
 
 /* Inverse to the previous function. */
-static struct timeval *
+struct timeval *
 t2p_posix2time_timeval (struct timeval *tv)
 {
   int state;
-  tv->tv_sec = posix2time (tv->tv_sec, &state);
+  tv->tv_sec = t2p_posix2time (tv->tv_sec, &state);
   if (state == 1)
     {
       tv->tv_usec <<= 1;
@@ -287,11 +260,11 @@ t2p_normalize_timespec (struct timespec *ts)
 }
 
 /* struct timespec version of t2p_time2posix_timeval */
-static struct timespec *
+struct timespec *
 t2p_time2posix_timespec (struct timespec *ts)
 {
   int state;
-  ts->tv_sec = time2posix (ts->tv_sec, &state);
+  ts->tv_sec = t2p_time2posix (ts->tv_sec, &state);
   if (state == 1)
     ts->tv_nsec >>= 1;
   else if (state == 2)
@@ -305,11 +278,11 @@ t2p_time2posix_timespec (struct timespec *ts)
 }
 
 /* struct timespec version of t2p_posix2time_timeval */
-static struct timespec *
+struct timespec *
 t2p_posix2time_timespec (struct timespec *ts)
 {
   int state;
-  ts->tv_sec = posix2time (ts->tv_sec, &state);
+  ts->tv_sec = t2p_posix2time (ts->tv_sec, &state);
   if (state == 1)
     {
       ts->tv_nsec <<= 1;
@@ -364,72 +337,22 @@ t2p_timestatus (time_t t)
   return TIME_OK;
 }
 
-/* a little test procedure */
-static void
-testthis (void)
-{
-  time_t t, e, pt2p = 0;
-  struct timeval tv;
-  int i;
-
-  t = t2p_leapsecs[t2p_leapsecs_num-1].transition-2;
-  e = t + 6;
-  printf ("time       time2posix st posix2time st status\n");
-  for (; t < e; t++)
-    {
-      time_t t2p, p2t;
-      int st1, st2, status = t2p_timestatus (t);
-
-      t2p = time2posix (t, &st1);
-
-      if (t2p == pt2p + 2)
-        {
-          p2t = posix2time (pt2p + 1, &st2);
-          printf ("           %li    %li %+i\n", pt2p+1, p2t, st2);
-        }
-      pt2p = t2p;
-
-      p2t = posix2time (t2p, &st2);
-      printf ("%li %li %+i %li %+i %s\n", t, t2p, st1, p2t, st2,
-              status == TIME_OK ? "OK" :
-              status == TIME_WAIT ? "WAIT" :
-              status == TIME_OOP ? "OOP" :
-              status == TIME_INS ? "INS" :
-              status == TIME_DEL ? "DEL" : "unknown");
-    }
-
-  printf ("\ntime         time2posix   posix2time\n");
-  tv.tv_sec = t2p_leapsecs[t2p_leapsecs_num-1].transition;
-  tv.tv_usec = 0;
-  for (i = 0; i < 20; i++)
-    {
-      struct timeval t2p, p2t;
-      t2p = tv;
-      t2p_time2posix_timeval (&t2p);
-      p2t = t2p;
-      t2p_posix2time_timeval (&p2t);
-      printf ("%li.%li %li.%li %li.%li\n", tv.tv_sec, tv.tv_usec/100000, t2p.tv_sec, t2p.tv_usec/100000, p2t.tv_sec, p2t.tv_usec/100000);
-      tv.tv_usec += 200000;
-      t2p_normalize_timeval (&tv);
-    }
-}
-
 /*
-static struct utmp *(*pututline_orig) (const struct utmp *);
-static void (*updwtmp_orig) (const char *, const struct utmp *);
-static struct utmpx *(*pututxline_orig) (const struct utmpx *);
-static void (*updwtmpx_orig) (const char *, const struct utmpx *);
+struct utmp *(*t2p_orig_pututline) (const struct utmp *);
+void (*t2p_orig_updwtmp) (const char *, const struct utmp *);
+struct utmpx *(*t2p_orig_pututxline) (const struct utmpx *);
+void (*t2p_orig_updwtmpx) (const char *, const struct utmpx *);
 */
-static time_t (*time_orig) (time_t *);
-static int (*stime_orig) (const time_t *);
-static int (*clock_gettime_orig) (clockid_t, struct timespec *);
-static int (*clock_settime_orig) (clockid_t, const struct timespec *);
-static int (*clock_adjtime_orig) (clockid_t, struct timex *);
-static int (*gettimeofday_orig) (struct timeval *, struct timezone *);
-static int (*settimeofday_orig) (const struct timeval *, const struct timezone *);
-static int (*adjtimex_orig) (struct timex *);
-static int (*ntp_adjtime_orig) (struct timex *);
-static int (*ntp_gettime_orig) (struct ntptimeval *);
+time_t (*t2p_orig_time) (time_t *);
+int (*t2p_orig_stime) (const time_t *);
+int (*t2p_orig_clock_gettime) (clockid_t, struct timespec *);
+int (*t2p_orig_clock_settime) (clockid_t, const struct timespec *);
+int (*t2p_orig_clock_adjtime) (clockid_t, struct timex *);
+int (*t2p_orig_gettimeofday) (struct timeval *, struct timezone *);
+int (*t2p_orig_settimeofday) (const struct timeval *, const struct timezone *);
+int (*t2p_orig_adjtimex) (struct timex *);
+int (*t2p_orig_ntp_adjtime) (struct timex *);
+int (*t2p_orig_ntp_gettime) (struct ntptimeval *);
 
 static void *t2p_libc_handle = NULL;
 
@@ -445,7 +368,7 @@ t2p_init (void)
   if (doneinit)
     return;
 
-  if (leaps_read ())
+  if (t2p_leaps_read ())
     exit (255);
 
   if (0)
@@ -456,21 +379,21 @@ t2p_init (void)
     exit (255);
 
 /*
-  pututline_orig = dlsym (handle, "pututline");
-  pututxline_orig = dlsym (handle, "pututxline");
-  updwtmp_orig = dlsym (handle, "updwtmp");
-  updwtmpx_orig = dlsym (handle, "updwtmpx");
+  t2p_orig_pututline = dlsym (handle, "pututline");
+  t2p_orig_pututxline = dlsym (handle, "pututxline");
+  t2p_orig_updwtmp = dlsym (handle, "updwtmp");
+  t2p_orig_updwtmpx = dlsym (handle, "updwtmpx");
 */
-  time_orig = dlsym (t2p_libc_handle, "time");
-  stime_orig = dlsym (t2p_libc_handle, "stime");
-  clock_gettime_orig = dlsym (t2p_libc_handle, "clock_gettime");
-  clock_settime_orig = dlsym (t2p_libc_handle, "clock_settime");
-  clock_adjtime_orig = dlsym (t2p_libc_handle, "clock_adjtime");
-  gettimeofday_orig = dlsym (t2p_libc_handle, "gettimeofday");
-  settimeofday_orig = dlsym (t2p_libc_handle, "settimeofday");
-  adjtimex_orig = dlsym (t2p_libc_handle, "adjtimex");
-  ntp_adjtime_orig = dlsym (t2p_libc_handle, "ntp_adjtime");
-  ntp_gettime_orig = dlsym (t2p_libc_handle, "ntp_gettime");
+  t2p_orig_time = dlsym (t2p_libc_handle, "time");
+  t2p_orig_stime = dlsym (t2p_libc_handle, "stime");
+  t2p_orig_clock_gettime = dlsym (t2p_libc_handle, "clock_gettime");
+  t2p_orig_clock_settime = dlsym (t2p_libc_handle, "clock_settime");
+  t2p_orig_clock_adjtime = dlsym (t2p_libc_handle, "clock_adjtime");
+  t2p_orig_gettimeofday = dlsym (t2p_libc_handle, "gettimeofday");
+  t2p_orig_settimeofday = dlsym (t2p_libc_handle, "settimeofday");
+  t2p_orig_adjtimex = dlsym (t2p_libc_handle, "adjtimex");
+  t2p_orig_ntp_adjtime = dlsym (t2p_libc_handle, "ntp_adjtime");
+  t2p_orig_ntp_gettime = dlsym (t2p_libc_handle, "ntp_gettime");
 }
 
 static void
@@ -478,156 +401,4 @@ t2p_fini (void)
 {
   if (t2p_libc_handle != NULL)
     dlclose (t2p_libc_handle);
-}
-
-/*
-struct utmp *
-pututline (const struct utmp *ut)
-{
-  return pututline_orig (ut);
-}
-
-void
-updwtmp (const char *file, const struct utmp *ut)
-{
-  return updwtmp_orig (file, ut);
-}
-
-struct utmpx *
-pututxline (const struct utmpx *ut)
-{
-  return pututxline_orig (ut);
-}
-
-void
-updwtmpx (const char *file, const struct utmpx *utx)
-{
-  return updwtmpx_orig (file, utx);
-}
-*/
-
-time_t time (time_t *t)
-{
-  int state;
-  time_t res = time_orig (t);
-  if (res == (time_t) -1)
-    return res;
-
-  res = time2posix (res, &state);
-  if (t != NULL)
-    *t = res;
-  return res;
-}
-
-int stime (const time_t *t)
-{
-  int state;
-  if (t == NULL)
-    return stime_orig (t);
-
-  time_t right = posix2time (*t, &state);
-  return stime_orig (&right);
-}
-
-int
-clock_gettime (clockid_t clkid, struct timespec *ts)
-{
-  int res = clock_gettime_orig (clkid, ts);
-  if (clkid == CLOCK_REALTIME || clkid == CLOCK_REALTIME_COARSE)
-    t2p_time2posix_timespec (ts);
-  return res;
-}
-
-int
-clock_settime (clockid_t clkid, const struct timespec *ts)
-{
-  if (clkid == CLOCK_REALTIME)
-    {
-      struct timespec myts;
-      memcpy (&myts, ts, sizeof (struct timespec));
-      t2p_posix2time_timespec (&myts);
-      return clock_settime_orig (clkid, &myts);
-    }
-  else
-    return clock_settime_orig (clkid, ts);
-}
-
-int
-gettimeofday (struct timeval *tv, struct timezone *tz)
-{
-  int res = gettimeofday_orig (tv, tz);
-  if (tv != NULL)
-    t2p_time2posix_timeval (tv);
-  return res;
-}
-
-int
-settimeofday (const struct timeval *tv, const struct timezone *tz)
-{
-  if (tv != NULL)
-    {
-      struct timeval mytv;
-      memcpy (&mytv, tv, sizeof (struct timeval));
-      t2p_posix2time_timeval (&mytv);
-      return settimeofday_orig (&mytv, tz);
-    }
-  else
-    return settimeofday_orig (tv, tz);
-}
-
-int
-adjtimex (struct timex *buf)
-{
-  int res, status;
-
-  if (buf == NULL)
-    return adjtimex_orig (buf);
-
-  /* we don't want to insert or delete leap seconds in the kernel */
-  buf->status &= ~(STA_INS|STA_DEL);
-  res = adjtimex_orig (buf);
-
-  status = t2p_timestatus (buf->time.tv_sec);
-
-  /* will/did something interesting happen today? */
-  switch (status)
-    {
-      case TIME_INS:
-      case TIME_OOP:
-        buf->status |= STA_INS;
-        break;
-      case TIME_DEL:
-        buf->status |= STA_DEL;
-        break;
-    }
-
-  t2p_time2posix_timeval (&buf->time);
-
-  return res == TIME_OK ? status : res;
-}
-
-/* clock_adjtime with CLOCK_REALTIME calls do_adjtimex in kernel */
-int
-clock_adjtime (clockid_t clkid, struct timex *buf)
-{
-  if (clkid == CLOCK_REALTIME)
-    return adjtimex (buf);
-  else
-    return clock_adjtime_orig (clkid, buf);
-}
-
-/* ntp_adjtime is an alias for adjtimex in glibc */
-int
-ntp_adjtime (struct timex *buf)
-{
-  return adjtimex (buf);
-}
-
-int
-ntp_gettime (struct ntptimeval *buf)
-{
-  int res = ntp_gettime_orig (buf);
-  if (buf != NULL)
-    t2p_time2posix_timeval (&buf->time);
-  return res;
 }
