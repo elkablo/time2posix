@@ -207,7 +207,7 @@ t2p_posix2time (time_t t, int *state)
 
   do
     if (i-- == 0)
-      return;
+      return t;
   while (t < t2p_leapsecs[i].posix_transition);
 
   ptr = t2p_leapsecs + i;
