@@ -13,8 +13,8 @@
 
 #include "time2posix.h"
 
-#define RIGHT_TZ "right/UTC"
-#define LEAP_TZFILE ("/usr/share/zoneinfo/" RIGHT_TZ)
+#define RIGHT_TZ "zoneinfo-leaps/UTC"
+#define LEAP_TZFILE ("/usr/share/" RIGHT_TZ)
 
 struct leapsecond *t2p_leapsecs = NULL;
 size_t t2p_leapsecs_num = 0;
