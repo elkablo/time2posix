@@ -4,4 +4,7 @@ if [ "x$TZ" == "x" ]; then
 	TZ=$(cat /etc/timezone)
 fi
 
-TZ=posix/$(echo $TZ | sed -e 's|right/||') LD_PRELOAD=@prefix@/@libdir@/time2posix.so exec "$@"
+TZ=$(echo "$TZ" | sed -e 's|\.\./zoneinfo-leaps/||')
+TZ=$(echo "$TZ" | sed -e 's|right/||')
+
+TZ="$TZ" LD_PRELOAD=@prefix@/@libdir@/time2posix.so exec "$@"
