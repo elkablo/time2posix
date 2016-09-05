@@ -419,6 +419,8 @@ t2p_init (void)
   fetchsymbol(ntp_adjtime);
   fetchsymbol(ntp_gettime);
 
+  fetchsymbol(recvmsg);
+
   if (t2p_leaps_read ())
     exit (255);
 }

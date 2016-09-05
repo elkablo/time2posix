@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <sys/time.h>
 #include <sys/timex.h>
+#include <sys/socket.h>
 
 struct leapsecond
 {
@@ -78,5 +79,6 @@ extern int (*t2p_orig_settimeofday) (const struct timeval *, const struct timezo
 extern int (*t2p_orig_adjtimex) (struct timex *);
 extern int (*t2p_orig_ntp_adjtime) (struct timex *);
 extern int (*t2p_orig_ntp_gettime) (struct ntptimeval *);
+extern ssize_t (*t2p_orig_recvmsg) (int, struct msghdr *, int);
 
 #endif /* !HAVE_TIME2POSIX_H */

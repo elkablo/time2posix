@@ -15,6 +15,7 @@ int (*t2p_orig_settimeofday) (const struct timeval *, const struct timezone *);
 int (*t2p_orig_adjtimex) (struct timex *);
 int (*t2p_orig_ntp_adjtime) (struct timex *);
 int (*t2p_orig_ntp_gettime) (struct ntptimeval *);
+ssize_t (*t2p_orig_recvmsg) (int, struct msghdr *, int);
 
 time_t time (time_t *t)
 {
@@ -139,5 +140,33 @@ ntp_gettime (struct ntptimeval *buf)
   int res = t2p_orig_ntp_gettime (buf);
   if (buf != NULL)
     t2p_time2posix_timeval (&buf->time);
+  return res;
+}
+
+ssize_t
+recvmsg (int fd, struct msghdr *msg, int flags)
+{
+  struct cmsghdr *cmsg;
+  ssize_t res = t2p_orig_recvmsg (fd, msg, flags);
+
+  if (res < 0 || !msg->msg_control || !msg->msg_controllen)
+    return res;
+
+  for (cmsg = CMSG_FIRSTHDR(msg); cmsg; cmsg = CMSG_NXTHDR(msg, cmsg))
+    {
+      switch (cmsg->cmsg_type)
+        {
+        case SCM_TIMESTAMPNS:
+          t2p_time2posix_timespec ((struct timespec *) CMSG_DATA(cmsg));
+          break;
+        case SCM_TIMESTAMP:
+          t2p_time2posix_timeval ((struct timeval *) CMSG_DATA(cmsg));
+          break;
+        default:
+          /* TODO: SCM_TIMESTAMPING */
+          break;
+        }
+    }
+
   return res;
 }
